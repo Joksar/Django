@@ -2,11 +2,12 @@ from django.shortcuts import render,get_object_or_404, HttpResponseRedirect
 from django.contrib.auth.decorators import user_passes_test
 from django.utils.decorators import method_decorator
 from django.urls import reverse, reverse_lazy
-from adminapp.forms import ShopUserAdminEditForm, ProductEditForm
+from adminapp.forms import ShopUserAdminEditForm, ProductEditForm, ProductCategoryEditForm
 from authapp.forms import ShopUserRegisterForm
 from authapp.models import ShopUser
 from mainapp.models import ProductCategory, Product
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
+from django.db.models import F
 
 @user_passes_test(lambda u: u.is_superuser)
 def user_create(request):
@@ -97,6 +98,21 @@ def category_update(request):
     }
     return render(request, '', context)
 
+class ProductCategoryUpdateView(UpdateView):
+    model = ProductCategory
+    form_class = ProductCategoryEditForm
+    template_name = 'adminapp/product_form.html'
+    success_url = reverse_lazy('adminapp:category_list')
+
+    def form_valid(self, form):
+        if 'discount' in form.cleaned_data:
+            discount = form.cleaned_data.get('discount')
+            if discount:
+                self.object.product_set.update(
+                    price=F('price') * (1 - discount/100)
+                )
+        return super().form_valid(form)
+
 @user_passes_test(lambda u: u.is_superuser)
 def category_delete(request):
     context = {
@@ -171,7 +187,7 @@ class ProductUpdateView(UpdateView):
 
 class ProductDeleteView(DeleteView):
     model = Product
-    template_name = 'adminapp/product_delete.html'
+    template_name = 'adminapp/user_delete.html'
 
     def get_success_url(self):
         product_item = Product.objects.get(pk=self.kwargs['pk'])

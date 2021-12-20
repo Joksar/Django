@@ -3,13 +3,31 @@ from mainapp.models import Product, ProductCategory
 from basketapp.models import Basket
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 import random
+from django.conf import settings
+from django.core.cache import cache
+from django.views.decorators.cache import cache_page, never_cache
+from django.db.models import Q
 
+def get_links_menu():
+    if settings.LOW_CACHE:
+        key = 'categories'
+        links_menu = cache.get(key)
+        if links_menu is None:
+            links_menu = ProductCategory.objects.filter(is_active=True)
+            cache.set(key, links_menu)
 
+        return links_menu
+    return ProductCategory.objects.filter(is_active=True)
 
-# def get_basket(user):
-#     if user.is_authenticated:
-#         return Basket.objects.filter(user=user)
-#     return None
+def get_category(pk):
+    if settings.LOW_CACHE:
+        key = f'category_{pk}'
+        category_item = cache.get(key)
+        if category_item is None:
+            category_item = get_object_or_404(ProductCategory, pk=pk)
+            cache.set(key, category_item)
+        return category_item
+    return get_object_or_404(ProductCategory, pk=pk)
 
 def get_hot_product():
     return random.sample(list(Product.objects.all()), 1)[0]
@@ -18,11 +36,13 @@ def get_same_products(hot_product):
     products_list = Product.objects.filter(category=hot_product.category).exclude(pk=hot_product.pk)[:3]
     return products_list
 
-
+@never_cache
 def index(request):
     context = {
         'title': 'Главная',
-        'products': Product.objects.all()[:4],
+        'products': Product.objects.filter(
+            Q(category__name='дом') | Q(category__name='офис')
+        ),
     }
     return render(request, 'mainapp/index.html', context)
 
@@ -33,7 +53,7 @@ def contact(request):
     }
     return render(request, 'mainapp/contact.html')
 
-
+@cache_page(3600)
 def products(request, pk=None, page=1):
     links_menu = ProductCategory.objects.all
     if pk is not None:
