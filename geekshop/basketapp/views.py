@@ -4,7 +4,7 @@ from django.template.loader import render_to_string
 from mainapp.models import Product
 from basketapp.models import Basket
 from django.contrib.auth.decorators import login_required
-
+from django.db.models import F
 
 @login_required
 def basket(request):
@@ -24,7 +24,7 @@ def add(request, pk):
     if not basket_item:
         basket_item = Basket(product=product_item, user=request.user)
 
-    basket_item.quantity += 1
+    basket_item.quantity += F('quantity') + 1
     basket_item.save()
 
     return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
